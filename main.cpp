@@ -1,4 +1,4 @@
-//******************************************/
+/******************************************/
 // Universidad del Valle de Guatemala
 // BE3029 - Electronica Digital 2
 // Catherine Bianchi 24080
@@ -18,7 +18,7 @@
 // Definiciones
 //******************************************/
 //Botón
-#define boton 22
+#define boton 35
 
 //LED RGB
 #define LEDrojo 13
@@ -30,36 +30,29 @@
 #define canalAzul 2
 
 //Servomotor
-#define pinServo 33
+#define pinServo 22
 #define canalServo 3
-
-//Sensor de temperatura
-#define LM35 15
-#define voltajeRef 3.3
-#define resolutionACD 4095
 
 //Condiciones 
 #define freqPWM 50
 #define resolution 12
 #define debounce 200
 
-//Displays
-const int segPins[8] = {4, 5, 18, 19, 21, 22, 23, 33}; //a, b, c, d, e, f, g, dp
+//Display
+#define pinA 16
+#define pinB 17
+#define pinC 32
+#define pinD 14
+#define pinE 33
+#define pinF 23
+#define pinG 4
+#define pinDP 26
+#define display1 21
+#define display2 19
+#define display3 18
 
-const int digitPins[3] = {27, 26, 14};
-
-const byte digitMap[10][8] ={
-  {1,1,1,1,1,1,0,0}, //0
-  {0,1,1,0,0,0,0,0}, //1
-  {1,1,0,1,1,0,1,0}, //2
-  {1,1,1,1,0,0,1,0}, //3
-  {0,1,1,0,0,1,1,0}, //4
-  {1,0,1,1,0,1,1,0}, //5
-  {1,0,1,1,1,1,1,0}, //6
-  {1,1,1,0,0,0,0,0}, //7
-  {1,1,1,1,1,1,1,0}, //8
-  {1,1,1,1,0,1,1,0}, //9
-};
+uint8_t pinesDisplay[8]={pinA, pinB, pinC, pinD, pinE, pinF, pinG, pinDP};
+uint8_t numero = 0;
 
 #define potPin 34
 
@@ -70,12 +63,11 @@ void initRGB(void);
 void color(int rojo, int verde, int azul);
 
 void initServo(void);
-
 void initDisplay(void);
-void actualizarDisplay(float temperatura);
+void displayPunto(uint8_t punto);
+void displayNumero(uint8_t numero);
 
 void IRAM_ATTR lectura();
-void IRAM_ATTR refrescarDisplay();
 
 //******************************************/
 // Variables globales
@@ -86,13 +78,6 @@ volatile unsigned long ultimo = 0;
 volatile bool flag = false;
 int leerEstado = 0;
 
-//Display
-volatile int digitosDisplay[3] = {0,0,0};
-volatile bool puntoDecimal = true;
-
-hw_timer_t *timerDisplay = NULL;
-volatile int digitoActual = 0;
-
 //******************************************/
 // ISRs Rutinas de Interrupcion
 //******************************************/
@@ -101,43 +86,33 @@ void IRAM_ATTR lectura(){
   if (ahora - ultimo > debounce){
     flag = true;
     ultimo = ahora;
-  }}
+  }
 
-void IRAM_ATTR refrescarDisplay(){
-  for (int i=0; i<3; i++){
-    digitalWrite(digitPins[i],LOW);}
-
-  int valor = digitosDisplay[digitoActual];
-  for (int i=0; i<7; i++){
-    digitalWrite(segPins[i], digitMap[valor][i]);  }
-
-  digitalWrite(segPins[7], (digitoActual == 1 && puntoDecimal) ? HIGH:LOW);
-
-  digitalWrite(digitPins[digitoActual], HIGH);
-
-  digitoActual++;
-  if (digitoActual >= 3){
-    digitoActual=0;  }
 }
 
 //******************************************/
-// Configuración
+// Configuracion
 //******************************************/
 void setup() {
-Serial.begin(115200);
-
 pinMode(LEDrojo, OUTPUT);
 pinMode(LEDazul, OUTPUT);
 pinMode(LEDverde, OUTPUT);
 
 pinMode(boton, INPUT);
-
 pinMode(potPin, INPUT);
+pinMode(pinServo, OUTPUT);
 
 initRGB();
 initServo();
+initDisplay();
 
 attachInterrupt(digitalPinToInterrupt(boton), lectura, RISING);
+pinMode(display1, OUTPUT);
+pinMode(display2, OUTPUT);
+pinMode(display3, OUTPUT);
+digitalWrite(display1, HIGH);
+digitalWrite(display2, HIGH);
+digitalWrite(display3, HIGH);
 
 }
 
@@ -145,48 +120,64 @@ attachInterrupt(digitalPinToInterrupt(boton), lectura, RISING);
 // Loop Principal
 //******************************************/
 void loop() {
-//potValue = analogRead(potPin);
-//temperatura = map(potValue, 0, 4095, 21, 29);
-
-//Lectura del sensor de temperatura
-float lectura = analogRead(LM35);
-float voltaje = (lectura*voltajeRef)/resolutionACD;
-float temperatura = voltaje*100;
-/*Serial.print("Voltaje: ");
-Serial.print(voltaje);
-Serial.print(" V  |  Temperatura: ");
-Serial.print(temp);
-Serial.println(" °C");*/
+potValue = analogRead(potPin);
+temperatura = map(potValue, 0, 4095, 21, 29);
 
 if(flag){
   flag = false;
   leerEstado = 1;
 }
 
-//RGB y servo para temperatura
+//RGB para temperatura
 if((!flag)&&(leerEstado==1)){
   leerEstado = 0;
 
 if ((temperatura < 23)){
-  color(0,0,255);}
+  color(0,0,4095);}
 else if ((temperatura>=23)&&(temperatura<25)){
-  color(0,255,0);}
+  color(0,4095,0);}
 else if ((temperatura>=25)&&(temperatura<27)){
-  color(255,255,0);}
+  color(4095,4095,0);}
 else if ((temperatura>27)){
-  color(255,0,0);}
+  color(4095,0,0);}
 
 if ((temperatura < 23)){
-  ledcWrite(canalServo, 205);} //0°
+  ledcWrite(canalServo, 102);} //0°
 else if ((temperatura>=23)&&(temperatura<25)){
-  ledcWrite(canalServo, 256);} //45°
+  ledcWrite(canalServo, 205);} //45°
 else if ((temperatura>=25)&&(temperatura<27)){
-  ledcWrite(canalServo, 256);} //45°
+  ledcWrite(canalServo, 205);} //45°
 else if ((temperatura>27)){
   ledcWrite(canalServo, 307);} //90°
-}
-}
 
+
+}
+//Display 1
+  digitalWrite(display1, HIGH);
+  digitalWrite(display2, LOW);   
+  digitalWrite(display3, LOW);
+  displayNumero(1);              
+  displayPunto(0);
+  delay(5);
+
+//Display 2
+  digitalWrite(display1, LOW);
+  digitalWrite(display2, HIGH);   
+  digitalWrite(display3, LOW);
+  displayNumero(8);              
+  displayPunto(1);
+  delay(5);
+
+//Display 3
+  digitalWrite(display1, LOW);
+  digitalWrite(display2, LOW);   
+  digitalWrite(display3, HIGH);
+  displayNumero(4);              
+  displayPunto(0);
+  delay(5);
+
+
+}
 
 
 //******************************************/
@@ -214,27 +205,42 @@ void color(int rojo, int verde, int azul){
 void initServo(void){
   ledcSetup(canalServo, freqPWM, resolution);
   ledcAttachPin(pinServo, canalServo);
-  ledcWrite(canalServo, 205); //Comienza desde 0°
 }
 
 //******************************************/
 // Funciones para Displays
 //******************************************/
-void initDisplays(){
-  for(int i=0; i<8; i++) pinMode(segPins[i],OUTPUT);
-  for(int i=0; i<3; i++) pinMode(digitPins[i], OUTPUT);
-
-  timerDisplay = timerBegin(0, 80, true);
-  timerAttachInterrupt(timerDisplay, &refrescarDisplay, true);
-  timerAlarmWrite(timerDisplay, 3000, true);
-  timerAlarmEnable(timerDisplay);
+void initDisplay(void){
+  for(size_t i=0; i<8; i++){
+    pinMode(pinesDisplay[i], OUTPUT);
+    digitalWrite(pinesDisplay[i], HIGH);
+  }
 }
 
-void actualizarDisplay(float temperatura){
-  int tempEntera = (int)temperatura;
-  int decimal = (int)round((temperatura-tempEntera)*10);
-
-  digitosDisplay[0] = tempEntera/10;
-  digitosDisplay[1] = tempEntera%10;
-  digitosDisplay[2] = decimal;
+void displayPunto(uint8_t punto){
+  if(punto == 1){
+    digitalWrite(pinDP, LOW); //encendido 
+  }else{
+    digitalWrite(pinDP, HIGH); //apagado
+  }
 }
+
+void displayNumero(uint8_t numero){
+  for(int i=0; i<7; i++){
+    digitalWrite(pinesDisplay[i], HIGH);
+  }
+
+  switch(numero){
+    case 0: digitalWrite(pinA,LOW); digitalWrite(pinB,LOW); digitalWrite(pinC,LOW); digitalWrite(pinD,LOW); digitalWrite(pinE,LOW); digitalWrite(pinF,LOW); break;
+    case 1: digitalWrite(pinB,LOW); digitalWrite(pinC,LOW); break;
+    case 2: digitalWrite(pinA,LOW); digitalWrite(pinB,LOW); digitalWrite(pinG,LOW); digitalWrite(pinD,LOW); digitalWrite(pinE, LOW); break;
+    case 3: digitalWrite(pinA,LOW); digitalWrite(pinB,LOW); digitalWrite(pinG,LOW); digitalWrite(pinC,LOW); digitalWrite(pinD,LOW); break;
+    case 4: digitalWrite(pinF,LOW); digitalWrite(pinG,LOW); digitalWrite(pinB,LOW); digitalWrite(pinC,LOW); break;
+    case 5: digitalWrite(pinA,LOW); digitalWrite(pinF,LOW); digitalWrite(pinG,LOW); digitalWrite(pinC,LOW); digitalWrite(pinD,LOW); break;
+    case 6: digitalWrite(pinA,LOW); digitalWrite(pinF,LOW); digitalWrite(pinG,LOW); digitalWrite(pinE,LOW); digitalWrite(pinC,LOW); digitalWrite(pinD,LOW); break;
+    case 7: digitalWrite(pinA,LOW); digitalWrite(pinB,LOW); digitalWrite(pinC,LOW); break;
+    case 8: digitalWrite(pinA,LOW); digitalWrite(pinB,LOW); digitalWrite(pinC,LOW); digitalWrite(pinD,LOW); digitalWrite(pinE,LOW); digitalWrite(pinF,LOW); digitalWrite(pinG,LOW); break;
+    case 9: digitalWrite(pinA,LOW); digitalWrite(pinF,LOW); digitalWrite(pinG,LOW); digitalWrite(pinB,LOW); digitalWrite(pinC,LOW); digitalWrite(pinD,LOW); break;
+  }
+}
+
