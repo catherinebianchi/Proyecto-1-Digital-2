@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <driver/gpio.h>
 #include <driver/ledc.h>
+#include "config.h"
 
 //******************************************/
 // Definiciones
@@ -58,6 +59,9 @@
 
 uint8_t pinesDisplay[8]={pinA, pinB, pinC, pinD, pinE, pinF, pinG, pinDP};
 
+//Adafruit IO
+#define IO_LOOP_DELAY 5000
+
 #define potPin 34
 
 
@@ -75,6 +79,8 @@ void actualizar(void);
 
 void IRAM_ATTR lectura();
 
+void handleMessage(AdafruitIO_Data *data);
+
 //******************************************/
 // Variables globales
 //******************************************/
@@ -89,6 +95,13 @@ int unidades;
 int decimal;
 
 //******************************************/
+// Adafruit IO
+//******************************************/
+unsigned long lastUpdate = 0;
+// set up the 'counter' feed
+AdafruitIO_Feed *canalTemperatura = io.feed("temperatura");
+
+//******************************************/
 // ISRs Rutinas de Interrupcion
 //******************************************/
 void IRAM_ATTR lectura(){
@@ -100,7 +113,7 @@ void IRAM_ATTR lectura(){
 
 
 //******************************************/
-// Configuración
+// Configuración SETUP
 //******************************************/
 void setup() {
 Serial.begin(115200);
@@ -124,12 +137,48 @@ digitalWrite(display1, HIGH);
 digitalWrite(display2, HIGH);
 digitalWrite(display3, HIGH);
 
+io.connect();
+// set up a message handler for the count feed.
+// the handleMessage function (defined below)
+// will be called whenever a message is
+// received from adafruit io.
+canalTemperatura->onMessage(handleMessage);
+
+// wait for a connection
+while (io.status() < AIO_CONNECTED) {
+  Serial.print(".");
+  delay(500);
 }
+
+  // we are connected
+  Serial.println();
+  Serial.println(io.statusText());
+  canalTemperatura->get();
+}
+
+
 
 //******************************************/
 // Loop Principal
 //******************************************/
 void loop() {
+//ADAFRUIT IO
+  // io.run(); is required for all sketches.
+  // it should always be present at the top of your loop
+  // function. it keeps the client connected to
+  // io.adafruit.com, and processes any incoming data.
+  io.run();
+
+  if (millis() > (lastUpdate + IO_LOOP_DELAY)) {
+    // save count to the 'counter' feed on Adafruit IO
+    Serial.print("sending -> ");
+    Serial.println(temperatura);
+    canalTemperatura->save(temperatura);
+
+    // after publishing, store the current time
+    lastUpdate = millis();
+  }
+
 potValue = analogRead(potPin);
 temperatura = map(potValue, 0, 4095, 21, 29);
 
@@ -193,10 +242,7 @@ Serial.print(" |  Unidades: ");
 Serial.print(unidades);
 Serial.print(" |  Decimal: ");
 Serial.println(decimal);*/
-
-
 }
-
 
 
 //******************************************/
@@ -288,4 +334,13 @@ void actualizar(){
   displayPunto(0);
   delay(5);
 
+}
+
+//******************************************/
+// Funciones para Adafruit IO
+//******************************************/
+void handleMessage(AdafruitIO_Data *data) {
+
+  Serial.print("received <- ");
+  Serial.println(data->value());
 }
