@@ -75,9 +75,9 @@ void initServo(void);
 void initDisplay(void);
 void displayPunto(uint8_t punto);
 void displayNumero(uint8_t numero);
-void actualizar(void);
 
 void IRAM_ATTR lectura();
+void configTimer(void);
 
 void handleMessage(AdafruitIO_Data *data);
 
@@ -90,9 +90,13 @@ volatile unsigned long ultimo = 0;
 volatile bool flag = false;
 int leerEstado = 0;
 int temp;
-int decenas; 
-int unidades; 
-int decimal;
+volatile int decenas; 
+volatile int unidades; 
+volatile int decimal;
+volatile uint8_t displayActivo = 0;         // 0, 1, o 2
+
+//Temporizador para Display
+hw_timer_t *Timer0_Display = NULL;
 
 //******************************************/
 // Adafruit IO
@@ -111,6 +115,27 @@ void IRAM_ATTR lectura(){
     ultimo = ahora;
   }}
 
+void IRAM_ATTR Timer0_ISR(){
+  switch(displayActivo){
+    case 0:
+      digitalWrite(display1, HIGH); digitalWrite(display2, LOW); digitalWrite(display3, LOW);
+      displayNumero(decenas);
+      displayPunto(0);
+      break;
+    case 1:
+      digitalWrite(display1, LOW); digitalWrite(display2, HIGH); digitalWrite(display3, LOW);
+      displayNumero(unidades);
+      displayPunto(1);
+      break;
+    case 2:
+      digitalWrite(display1, LOW); digitalWrite(display2, LOW); digitalWrite(display3, HIGH);
+      displayNumero(decimal);
+      displayPunto(0);
+      break;
+  }
+
+  displayActivo = (displayActivo + 1) % 3; // avanza al siguiente display
+}
 
 //******************************************/
 // Configuración SETUP
@@ -129,13 +154,17 @@ initRGB();
 initServo();
 initDisplay();
 
-attachInterrupt(digitalPinToInterrupt(boton), lectura, RISING);
+
 pinMode(display1, OUTPUT);
 pinMode(display2, OUTPUT);
 pinMode(display3, OUTPUT);
 digitalWrite(display1, HIGH);
 digitalWrite(display2, HIGH);
 digitalWrite(display3, HIGH);
+
+attachInterrupt(digitalPinToInterrupt(boton), lectura, FALLING);
+configTimer();
+
 
 io.connect();
 // set up a message handler for the count feed.
@@ -198,6 +227,7 @@ Serial.println(" °C");*/
 if(flag){
   flag = false;
   leerEstado = 1;
+  Serial.print("Botón disparado");
 }
 
 //RGB y servo para temperatura
@@ -231,8 +261,6 @@ temp = temp - (unidades*10);
 decimal = temp;
 }
 
-
-actualizar();
 
 /*Serial.print("Temperatura: ");
 Serial.print(temperatura);
@@ -283,7 +311,7 @@ void initDisplay(void){ //Configuración de segmentos y displays como OUTPUT y a
   }
 }
 
-void displayPunto(uint8_t punto){ //Se enciende el punto decimal
+void IRAM_ATTR displayPunto(uint8_t punto){ //Se enciende el punto decimal (IRAM_ATTR porque se llama en el timer)
   if(punto == 1){
     digitalWrite(pinDP, LOW); //encendido 
   }else{
@@ -291,7 +319,7 @@ void displayPunto(uint8_t punto){ //Se enciende el punto decimal
   }
 }
 
-void displayNumero(uint8_t numero){
+void IRAM_ATTR displayNumero(uint8_t numero){ //Define el número en el display (IRAM_ATTR porque se llama en el timer)
   for(int i=0; i<7; i++){
     digitalWrite(pinesDisplay[i], HIGH); //Se apagan todos los segmentos para borrar el número pasado
   }
@@ -309,31 +337,12 @@ void displayNumero(uint8_t numero){
     case 9: digitalWrite(pinA,LOW); digitalWrite(pinF,LOW); digitalWrite(pinG,LOW); digitalWrite(pinB,LOW); digitalWrite(pinC,LOW); digitalWrite(pinD,LOW); break;
   }
 }
-void actualizar(){
-//Display 1
-  digitalWrite(display1, HIGH);
-  digitalWrite(display2, LOW);   
-  digitalWrite(display3, LOW);
-  displayNumero(decenas);              
-  displayPunto(0);
-  delay(5);
 
-//Display 2
-  digitalWrite(display1, LOW);
-  digitalWrite(display2, HIGH);   
-  digitalWrite(display3, LOW);
-  displayNumero(unidades);              
-  displayPunto(1);
-  delay(5);
-
-//Display 3
-  digitalWrite(display1, LOW);
-  digitalWrite(display2, LOW);   
-  digitalWrite(display3, HIGH);
-  displayNumero(decimal);              
-  displayPunto(0);
-  delay(5);
-
+void configTimer(){ //Configuración del temporizador
+  Timer0_Display = timerBegin(0, 80, true);
+  timerAttachInterrupt(Timer0_Display, &Timer0_ISR, true);
+  timerAlarmWrite(Timer0_Display, 3000, true);
+  timerAlarmEnable(Timer0_Display);
 }
 
 //******************************************/
