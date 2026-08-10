@@ -19,12 +19,12 @@
 // Definiciones
 //******************************************/
 // Botón
-#define boton 35
+#define boton 36
 
 // LED RGB
-#define LEDrojo 13
-#define LEDverde 27
-#define LEDazul 25
+#define LEDrojo 17
+#define LEDverde 16
+#define LEDazul 4
 
 #define canalRojo 0
 #define canalVerde 1
@@ -35,34 +35,34 @@
 #define canalServo 3
 
 // Sensor de temperatura
-#define LM35 39
+#define LM35 34
 #define voltajeRef 3.3
 #define resolutionACD 4095
 
 // Condiciones
 #define freqPWM 50
 #define resolution 12
-#define debounce 200
+#define debounce 300
 
 // Display
-#define pinA 16
-#define pinB 17
-#define pinC 32
-#define pinD 14
-#define pinE 33
-#define pinF 23
-#define pinG 4
-#define pinDP 26
-#define display1 21
+#define pinA 23
+#define pinB 33
+#define pinC 13
+#define pinD 32
+#define pinE 25
+#define pinF 26
+#define pinG 27
+#define pinDP 14
+#define display1 18
 #define display2 19
-#define display3 18
+#define display3 21
 
 uint8_t pinesDisplay[8] = {pinA, pinB, pinC, pinD, pinE, pinF, pinG, pinDP};
 
 // Adafruit IO
 #define IO_LOOP_DELAY 5000
 
-#define potPin 34
+#define potPin 39
 
 //******************************************/
 // Prototipos de funciones
@@ -71,11 +71,13 @@ void initRGB(void);
 void color(int rojo, int verde, int azul);
 
 void initServo(void);
+
 void initDisplay(void);
 void displayPunto(uint8_t punto);
 void displayNumero(uint8_t numero);
 
 void IRAM_ATTR lectura();
+
 void configTimer(void);
 
 void handleMessage(AdafruitIO_Data *data);
@@ -107,20 +109,16 @@ AdafruitIO_Feed *canalTemperatura = io.feed("temperatura");
 //******************************************/
 // ISRs Rutinas de Interrupcion
 //******************************************/
-void IRAM_ATTR lectura()
-{
+void IRAM_ATTR lectura(){ //Lectura del botón
   unsigned long ahora = millis();
-  if (ahora - ultimo > debounce)
-  {
+  if (ahora - ultimo > debounce)  {
     flag = true;
     ultimo = ahora;
   }
 }
 
-void IRAM_ATTR Timer0_ISR()
-{
-  switch (displayActivo)
-  {
+void IRAM_ATTR Timer0_ISR(){ //Temporizador para display - indica cuál display se encenderá y el número asignado
+  switch (displayActivo)  {
   case 0:
     digitalWrite(display1, HIGH);
     digitalWrite(display2, LOW);
@@ -159,6 +157,7 @@ void setup()
 
   pinMode(boton, INPUT);
   pinMode(potPin, INPUT);
+  pinMode(LM35, INPUT);
   pinMode(pinServo, OUTPUT);
 
   initRGB();
@@ -168,7 +167,7 @@ void setup()
   pinMode(display1, OUTPUT);
   pinMode(display2, OUTPUT);
   pinMode(display3, OUTPUT);
-  digitalWrite(display1, HIGH);
+  digitalWrite(display1, HIGH); //Los displays son de ánodo común: HIGH = apagado y LOW = encendido
   digitalWrite(display2, HIGH);
   digitalWrite(display3, HIGH);
 
@@ -207,27 +206,27 @@ void loop()
   //  io.adafruit.com, and processes any incoming data.
   io.run();
 
-  // potValue = analogRead(potPin);
-  // temperatura = map(potValue, 0, 4095, 21, 29);
+
+  //Pruebas de rangos de temperatura con Potenciómetro
+  //potValue = analogRead(potPin);
+  //temperatura = map(potValue, 0, 4095, 21, 29);
 
   // Lectura del sensor de temperatura
   float lectura = analogRead(LM35);
   float voltaje = (lectura * voltajeRef) / resolutionACD;
   float temperatura2 = voltaje * 100;
-  float temperatura = temperatura2 + 10;
+  temperatura = temperatura2 + 10;
 
-  Serial.print("Voltaje: ");
+  /*Serial.print("Voltaje: ");
   Serial.print(voltaje);
   Serial.print(" V  |  Temperatura: ");
   Serial.print(temperatura);
-  Serial.println(" °C");
+  Serial.println(" °C");*/
 
   // Si se presiona el botón
-  if (flag)
-  {
+  if (flag)  {
     flag = false;
     leerEstado = 1;
-    Serial.print("Botón disparado");
   }
 
   // RGB y servo para temperatura
