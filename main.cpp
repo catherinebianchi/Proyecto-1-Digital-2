@@ -94,7 +94,8 @@ int temp;
 volatile int decenas;
 volatile int unidades;
 volatile int decimal;
-volatile uint8_t displayActivo = 0; // 0, 1, o 2
+volatile uint8_t displayActivo = 0; 
+int anguloServo = 0;
 
 // Temporizador para Display
 hw_timer_t *Timer0_Display = NULL;
@@ -105,6 +106,7 @@ hw_timer_t *Timer0_Display = NULL;
 unsigned long lastUpdate = 0;
 // set up the 'counter' feed
 AdafruitIO_Feed *canalTemperatura = io.feed("temperatura");
+AdafruitIO_Feed *Servo = io.feed("posicionservo");
 
 //******************************************/
 // ISRs Rutinas de Interrupcion
@@ -180,6 +182,7 @@ void setup()
   // will be called whenever a message is
   // received from adafruit io.
   canalTemperatura->onMessage(handleMessage);
+  Servo->onMessage(handleMessage);
 
   // wait for a connection
   while (io.status() < AIO_CONNECTED)
@@ -192,6 +195,7 @@ void setup()
   Serial.println();
   Serial.println(io.statusText());
   canalTemperatura->get();
+  Servo->get();
 }
 
 //******************************************/
@@ -243,13 +247,17 @@ void loop()
       color(4095, 0, 0);    } // Rojo
 
     if ((temperatura < 23))    {
-      ledcWrite(canalServo, 102);    } // 0°
+      ledcWrite(canalServo, 102);
+      anguloServo = 0;    } // 0°
     else if ((temperatura >= 23) && (temperatura < 25))    {
-      ledcWrite(canalServo, 205);    } // 45°
+      ledcWrite(canalServo, 205);
+      anguloServo = 45;    } // 45°
     else if ((temperatura >= 25) && (temperatura < 27))    {
-      ledcWrite(canalServo, 205);    } // 45°
+      ledcWrite(canalServo, 205);
+      anguloServo = 45;    } // 45°
     else if ((temperatura > 27))    {
-      ledcWrite(canalServo, 307);    } // 90°
+      ledcWrite(canalServo, 307);
+      anguloServo = 90;    } // 90°
 
     // Cálculos para decenas, unidades y decimal
     temp = temperatura * 10;
@@ -266,6 +274,7 @@ void loop()
     Serial.print("sending -> ");
     Serial.println(temperatura);
     canalTemperatura->save(temperatura);
+    Servo->save(anguloServo);
 
     // after publishing, store the current time
     lastUpdate = millis();
